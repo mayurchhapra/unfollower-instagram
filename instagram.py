@@ -14,7 +14,7 @@ cache_dir = 'cache'
 session_cache = '%s/session.txt' % (cache_dir)
 followers_cache = '%s/followers.json' % (cache_dir)
 following_cache = '%s/following.json' % (cache_dir)
-unfollower_list = '%s/unfollowers.json' % (cache_dir)
+unfollow_users_cache = '%s/unfollowers.json' % (cache_dir)
 unfollow_user_file = '%s/unfollow_user.json' % (cache_dir)
 
 
@@ -37,7 +37,7 @@ class Credentials:
             self.password = sys.argv[2]
         elif 1==1:
             self.username = 'mayur._gajjar'
-            self.password = 'mA20225138'
+            self.password = 'mngajjar'
         else:
             sys.exit('Please provide INSTA_USERNAME and INSTA_PASSWORD environement variables or as an argument as such: ./insta-unfollower.py USERNAME PASSWORD.\nAborting...')
 
@@ -191,9 +191,15 @@ def unfollow(user):
     session.headers.update({
         'x-csrftoken': response.cookies['csrftoken']
     })
-
-    response = session.post(unfollow_route % (instagram_url, user['id']))
-    response = json.loads(response.text)
+    try:
+        response = session.post(unfollow_route % (instagram_url, user['id']))
+        f = open('res.json', 'w')
+        f.write(response.text)
+        f.close()
+        response = json.loads(response.text)
+    except Exception as e:
+        print(e)
+        return False
 
     if response['status'] != 'ok':
         print('Error while trying to unfollow {}. Retrying in a bit...'.format(user['username']))
@@ -226,52 +232,60 @@ def main():
 
     time.sleep(random.randint(2, 4))
 
-    following_list = []
-    if os.path.isfile(following_cache):
-        with open(following_cache, 'r') as f:
-            following_list = json.load(f)
-            print('following list loaded from cache file')
+    unfollow_users_list = []
+    if os.path.isfile(unfollow_users_cache):
+        print('Found unfollower user list')
+        with open(unfollow_users_cache, 'r') as f:
+            unfollow_users_list = json.load(f)
+            print('Loaded Unfollower list')
 
-    if len(following_list) != connected_user['edge_follow']['count']:
-        if len(following_list) > 0:
-            print('rebuilding following list...', end='', flush=True)
-        else:
-            print('building following list...', end='', flush=True)
-        following_list = get_following_list()
-        print(' done')
+    if len(unfollow_users_list) == 0:
+        following_list = []
+        if os.path.isfile(following_cache):
+            with open(following_cache, 'r') as f:
+                following_list = json.load(f)
+                print('following list loaded from cache file')
 
-        with open(following_cache, 'w') as f:
-            json.dump(following_list, f)
+        if len(following_list) != connected_user['edge_follow']['count']:
+            if len(following_list) > 0:
+                print('rebuilding following list...', end='', flush=True)
+            else:
+                print('building following list...', end='', flush=True)
+            following_list = get_following_list()
+            print(' done')
 
-    followers_list = []
-    if os.path.isfile(followers_cache):
-        with open(followers_cache, 'r') as f:
-            followers_list = json.load(f)
-            print('followers list loaded from cache file')
+            with open(following_cache, 'w') as f:
+                json.dump(following_list, f)
 
-    if len(followers_list) != connected_user['edge_followed_by']['count']:
-        if len(following_list) > 0:
-            print('rebuilding followers list...', end='', flush=True)
-        else:
-            print('building followers list...', end='', flush=True)
-        followers_list = get_followers_list()
-        print(' done')
+        followers_list = []
+        if os.path.isfile(followers_cache):
+            with open(followers_cache, 'r') as f:
+                followers_list = json.load(f)
+                print('followers list loaded from cache file')
 
-        with open(followers_cache, 'w') as f:
-            json.dump(followers_list, f)
+        if len(followers_list) != connected_user['edge_followed_by']['count']:
+            if len(following_list) > 0:
+                print('rebuilding followers list...', end='', flush=True)
+            else:
+                print('building followers list...', end='', flush=True)
+            followers_list = get_followers_list()
+            print(' done')
 
-    followers_usernames = {user['username'] for user in followers_list}
-    unfollow_users_list = [user for user in following_list if user['username'] not in followers_usernames]
+            with open(followers_cache, 'w') as f:
+                json.dump(followers_list, f)
 
-    unfollow_users = []
-    if len(unfollow_users_list) > 0:
-        with open(unfollow_users_cache, 'w') as f:
-            json.dump(unfollow_users_list, f)
+        followers_usernames = {user['username'] for user in followers_list}
+        unfollow_users_list = [user for user in following_list if user['username'] not in followers_usernames]
+
+        
+        if len(unfollow_users_list) > 0:
+            with open(unfollow_users_cache, 'w') as f:
+                json.dump(unfollow_users_list, f)
 
     print('you are following {} user(s) who aren\'t following you:'.format(len(unfollow_users_list)))
     for user in unfollow_users_list:
         print(user['username'])
-
+    unfollow_users = []
     if len(unfollow_users_list) > 0:
         print('Begin to unfollow users...')
 
